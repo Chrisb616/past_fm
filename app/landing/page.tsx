@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Box, Button, Container, TextField, Typography } from "@mui/material";
+import { Box, Button, Container, TextField, Typography, Stack } from "@mui/material";
 
 export default function Landing() {
   const router = useRouter();
@@ -19,27 +19,27 @@ export default function Landing() {
       <Typography variant="h3" component="h1" gutterBottom sx={{ fontWeight: 700 }}>
         Past.fm
       </Typography>
-      <Box sx={{ mt: 3, mx: "auto", maxWidth: 480, width: "100%" }}>
-        <TextField
-          fullWidth
-          placeholder="Enter last.fm username"
-          value={username}
-          onChange={(event) => setUsername(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") handleGetStarted();
-          }}
-          slotProps={{
-            input: {
-              sx: { borderRadius: 2, backgroundColor: "#fff" },
-            },
-          }}
-          sx={{ textAlign: "left" }}
-        />
-        <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 2 }}>
+      <Box sx={{ mt: 5, mx: "auto", maxWidth: 480, width: "100%" }}>
+        <Stack direction = "row" spacing={2}>
+          <TextField
+            fullWidth
+            placeholder="Enter Last.fm username"
+            value={username}
+            onChange={(event) => setUsername(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") handleGetStarted();
+            }}
+            slotProps={{
+              input: {
+                sx: { borderRadius: 2, backgroundColor: "#fff" },
+              },
+            }}
+            sx={{ textAlign: "left" }}
+          />
           <Button variant="contained" onClick={handleGetStarted}>
-            Get Started
+            Continue
           </Button>
-        </Box>
+        </Stack>
       </Box>
     </Container>
   );
