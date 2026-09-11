@@ -1,3 +1,4 @@
+@layer theme, base, mui, components, utilities;
 @import "tailwindcss";
 
 :root {
@@ -14,8 +15,8 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #FDF6E3;
+    --foreground: #000000;
   }
 }
 
