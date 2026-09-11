@@ -40,6 +40,7 @@ import {
 } from "@/lib/home-query";
 import { SEASONS, listSelectableYears, type Season } from "@/lib/seasons";
 import { listSelectableCalendarYears } from "@/lib/time-ranges";
+import { useToast } from "@/components/toast";
 
 const TYPE_LABELS: Record<RangeType, string> = {
   annual: "Annual",
@@ -66,6 +67,7 @@ type TracksLoad = {
 function Home() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { showToast } = useToast();
   const query = canonicalizeHomeQuery(parseHomeQuery(searchParams));
 
   const [usernameDraft, setUsernameDraft] = useState("");
@@ -100,14 +102,25 @@ function Home() {
     let cancelled = false;
 
     getUserInfoAction(user)
-      .then((info) => {
+      .then((result) => {
         if (cancelled) return;
-        setUserInfo(info);
+        if (!result.ok) {
+          showToast(
+            result.reason === "not_found"
+              ? `User ${user} not found`
+              : "Something went wrong, please try again",
+            "failure",
+          );
+          setUsernameDraft(user);
+          router.replace("/");
+          return;
+        }
+        setUserInfo(result.user);
         setUserInfoUser(user);
       })
       .catch(() => {
         if (cancelled) return;
-        // TODO: Error toast here
+        showToast("Something went wrong, please try again", "failure");
         setUsernameDraft(user);
         router.replace("/");
       });
@@ -115,7 +128,7 @@ function Home() {
     return () => {
       cancelled = true;
     };
-  }, [query.user, router, userInfoUser]);
+  }, [query.user, router, showToast, userInfoUser]);
 
   useEffect(() => {
     if (!showTracks || !query.user || query.from === undefined || query.to === undefined) {

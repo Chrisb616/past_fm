@@ -1,7 +1,7 @@
 "use server";
 
 import { getLastFmApiKey, getRecentTracksInRange, getUserInfo } from "./client";
-import { LastFmError } from "./errors";
+import { LastFmError, isUserNotFoundError } from "./errors";
 import type { UserImage } from "./types";
 
 export type UserInfoDto = {
@@ -20,22 +20,32 @@ export type TrackDto = {
   playedAtIso: string | null;
 };
 
-export async function getUserInfoAction(user: string): Promise<UserInfoDto> {
+export type GetUserInfoActionResult =
+  | { ok: true; user: UserInfoDto }
+  | { ok: false; reason: "not_found" | "unknown" };
+
+export async function getUserInfoAction(user: string): Promise<GetUserInfoActionResult> {
   try {
     const apiKey = await getLastFmApiKey();
     const info = await getUserInfo({ apiKey, user });
     return {
-      name: info.name,
-      realname: info.realName ?? "",
-      url: info.url,
-      playcount: info.playcount,
-      registered: info.registeredAt
-        ? Math.floor(info.registeredAt.getTime() / 1000)
-        : 0,
-      imageUrl: userImageUrl(info.images),
+      ok: true,
+      user: {
+        name: info.name,
+        realname: info.realName ?? "",
+        url: info.url,
+        playcount: info.playcount,
+        registered: info.registeredAt
+          ? Math.floor(info.registeredAt.getTime() / 1000)
+          : 0,
+        imageUrl: userImageUrl(info.images),
+      },
     };
   } catch (error) {
-    throw new Error(errorMessage(error, "Failed to load user."));
+    return {
+      ok: false,
+      reason: isUserNotFoundError(error) ? "not_found" : "unknown",
+    };
   }
 }
 
