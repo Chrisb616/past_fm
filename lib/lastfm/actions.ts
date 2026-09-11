@@ -1,6 +1,6 @@
 "use server";
 
-import { getLastFmClient } from "./client";
+import { getLastFmApiKey, getRecentTracksInRange, getUserInfo } from "./client";
 import { LastFmError } from "./errors";
 import type { UserImage } from "./types";
 
@@ -22,8 +22,8 @@ export type TrackDto = {
 
 export async function getUserInfoAction(user: string): Promise<UserInfoDto> {
   try {
-    const client = await getLastFmClient();
-    const info = await client.getUserInfo({ user });
+    const apiKey = await getLastFmApiKey();
+    const info = await getUserInfo({ apiKey, user });
     return {
       name: info.name,
       realname: info.realName ?? "",
@@ -45,8 +45,8 @@ export async function getRecentTracksAction(params: {
   to: number;
 }): Promise<TrackDto[]> {
   try {
-    const client = await getLastFmClient();
-    const tracks = await client.getRecentTracksInRange(params);
+    const apiKey = await getLastFmApiKey();
+    const tracks = await getRecentTracksInRange({ apiKey, ...params });
     return tracks.map((track) => ({
       artistName: track.artist.name,
       name: track.name,

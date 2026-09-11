@@ -89,155 +89,161 @@ type LastFmUserInfoResponse = LastFmErrorPayload & {
   user?: LastFmUserInfoJson;
 };
 
-export class LastFmClient {
-  constructor(private readonly apiKey: string) {}
+export async function getRecentTracks(
+  params: GetRecentTracksParams,
+): Promise<RecentTracksPage> {
+  const user = requireUser(params.user);
+  const from = toUnixSeconds(params.from);
+  const to = toUnixSeconds(params.to);
+  requireRange(from, to);
 
-  async getRecentTracks(params: GetRecentTracksParams): Promise<RecentTracksPage> {
-    const user = requireUser(params.user);
-    const from = toUnixSeconds(params.from);
-    const to = toUnixSeconds(params.to);
-    requireRange(from, to);
-
-    const limit = params.limit ?? 50;
-    if (!Number.isInteger(limit) || limit < 1 || limit > MAX_LIMIT) {
-      throw new RangeError(`limit must be an integer between 1 and ${MAX_LIMIT}`);
-    }
-
-    const page = params.page ?? 1;
-    if (!Number.isInteger(page) || page < 1) {
-      throw new RangeError("page must be an integer greater than or equal to 1");
-    }
-
-    const url = new URL(API_ROOT);
-    url.searchParams.set("method", "user.getrecenttracks");
-    url.searchParams.set("api_key", this.apiKey);
-    url.searchParams.set("format", "json");
-    url.searchParams.set("user", user);
-    url.searchParams.set("from", String(from));
-    url.searchParams.set("to", String(to));
-    url.searchParams.set("limit", String(limit));
-    url.searchParams.set("page", String(page));
-
-    const payload = await this.requestJson<LastFmRecentTracksResponse>(url, params.signal);
-    if (!payload.recenttracks) {
-      throw new LastFmError(8, "Last.fm response was missing recenttracks");
-    }
-
-    const tracks = unwrapList(payload.recenttracks.track).map(normalizeTrack);
-    const attr = payload.recenttracks["@attr"];
-
-    return {
-      tracks,
-      user: attr?.user ?? user,
-      page: parseCount(attr?.page, page),
-      perPage: parseCount(attr?.perPage, limit),
-      totalPages: parseCount(attr?.totalPages, 0),
-      total: parseCount(attr?.total, tracks.length),
-    };
+  const limit = params.limit ?? 50;
+  if (!Number.isInteger(limit) || limit < 1 || limit > MAX_LIMIT) {
+    throw new RangeError(`limit must be an integer between 1 and ${MAX_LIMIT}`);
   }
 
-  async getRecentTracksInRange(
-    params: GetRecentTracksInRangeParams,
-  ): Promise<RecentTrack[]> {
-    const firstPage = await this.getRecentTracks({
-      ...params,
-      limit: DEFAULT_RANGE_LIMIT,
-      page: 1,
-    });
-
-    const tracks = scrobbledTracks(firstPage.tracks);
-    const totalPages = firstPage.totalPages;
-
-    for (let page = 2; page <= totalPages; page += 1) {
-      await delay(PAGE_DELAY_MS, params.signal);
-      const nextPage = await this.getRecentTracks({
-        ...params,
-        limit: DEFAULT_RANGE_LIMIT,
-        page,
-      });
-      tracks.push(...scrobbledTracks(nextPage.tracks));
-    }
-
-    return tracks;
+  const page = params.page ?? 1;
+  if (!Number.isInteger(page) || page < 1) {
+    throw new RangeError("page must be an integer greater than or equal to 1");
   }
 
-  async getUserInfo(params: GetUserInfoParams): Promise<UserInfo> {
-    const user = requireUser(params.user);
+  const url = withLastFmQuery("user.getrecenttracks", params.apiKey, {
+    user,
+    from: String(from),
+    to: String(to),
+    limit: String(limit),
+    page: String(page),
+  });
 
-    const url = new URL(API_ROOT);
-    url.searchParams.set("method", "user.getinfo");
-    url.searchParams.set("api_key", this.apiKey);
-    url.searchParams.set("format", "json");
-    url.searchParams.set("user", user);
-
-    const payload = await this.requestJson<LastFmUserInfoResponse>(url, params.signal);
-    if (!payload.user) {
-      throw new LastFmError(8, "Last.fm response was missing user");
-    }
-
-    return normalizeUser(payload.user);
+  const payload = await requestJson<LastFmRecentTracksResponse>(url, params.signal);
+  if (!payload.recenttracks) {
+    throw new LastFmError(8, "Last.fm response was missing recenttracks");
   }
 
-  private async requestJson<T extends LastFmErrorPayload>(
-    url: URL,
-    callerSignal?: AbortSignal,
-  ): Promise<T> {
-    let lastError: unknown;
+  const tracks = unwrapList(payload.recenttracks.track).map(normalizeTrack);
+  const attr = payload.recenttracks["@attr"];
 
-    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
-      try {
-        return await this.fetchJson<T>(url, callerSignal);
-      } catch (error) {
-        lastError = error;
-        if (callerSignal?.aborted || !isRetryable(error) || attempt === MAX_ATTEMPTS) {
-          throw error;
-        }
-        await delay(250 * 2 ** (attempt - 1), callerSignal);
-      }
-    }
-
-    throw lastError;
-  }
-
-  private async fetchJson<T extends LastFmErrorPayload>(
-    url: URL,
-    callerSignal?: AbortSignal,
-  ): Promise<T> {
-    const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
-    const signal = callerSignal ? AbortSignal.any([callerSignal, timeout]) : timeout;
-
-    const response = await fetch(url, {
-      headers: { "User-Agent": USER_AGENT },
-      signal,
-    });
-
-    if (!response.ok) {
-      throw new LastFmError(
-        response.status,
-        `Last.fm request failed with HTTP ${response.status}`,
-      );
-    }
-
-    const payload = (await response.json()) as T;
-
-    if (typeof payload.error === "number") {
-      throw new LastFmError(payload.error, payload.message ?? "Last.fm request failed");
-    }
-
-    return payload;
-  }
+  return {
+    tracks,
+    user: attr?.user ?? user,
+    page: parseCount(attr?.page, page),
+    perPage: parseCount(attr?.perPage, limit),
+    totalPages: parseCount(attr?.totalPages, 0),
+    total: parseCount(attr?.total, tracks.length),
+  };
 }
 
-let clientPromise: Promise<LastFmClient> | undefined;
+export async function getRecentTracksInRange(
+  params: GetRecentTracksInRangeParams,
+): Promise<RecentTrack[]> {
+  const firstPage = await getRecentTracks({
+    ...params,
+    limit: DEFAULT_RANGE_LIMIT,
+    page: 1,
+  });
 
-export function getLastFmClient(): Promise<LastFmClient> {
-  clientPromise ??= loadLastFmSecrets()
-    .then((secrets) => new LastFmClient(secrets.api_key))
+  let tracks = scrobbledTracks(firstPage.tracks);
+  const totalPages = firstPage.totalPages;
+
+  for (let page = 2; page <= totalPages; page += 1) {
+    await delay(PAGE_DELAY_MS, params.signal);
+    const nextPage = await getRecentTracks({
+      ...params,
+      limit: DEFAULT_RANGE_LIMIT,
+      page,
+    });
+    tracks = tracks.concat(scrobbledTracks(nextPage.tracks));
+  }
+
+  return tracks;
+}
+
+export async function getUserInfo(params: GetUserInfoParams): Promise<UserInfo> {
+  const user = requireUser(params.user);
+  const url = withLastFmQuery("user.getinfo", params.apiKey, { user });
+
+  const payload = await requestJson<LastFmUserInfoResponse>(url, params.signal);
+  if (!payload.user) {
+    throw new LastFmError(8, "Last.fm response was missing user");
+  }
+
+  return normalizeUser(payload.user);
+}
+
+let apiKeyPromise: Promise<string> | undefined;
+
+export function getLastFmApiKey(): Promise<string> {
+  apiKeyPromise ??= loadLastFmSecrets()
+    .then((secrets) => secrets.api_key)
     .catch((error: unknown) => {
-      clientPromise = undefined;
+      apiKeyPromise = undefined;
       throw error;
     });
-  return clientPromise;
+  return apiKeyPromise;
+}
+
+function withLastFmQuery(
+  method: string,
+  apiKey: string,
+  extra: Record<string, string>,
+): URL {
+  const url = new URL(API_ROOT);
+  url.searchParams.set("method", method);
+  url.searchParams.set("api_key", apiKey);
+  url.searchParams.set("format", "json");
+  for (const [key, value] of Object.entries(extra)) {
+    url.searchParams.set(key, value);
+  }
+  return url;
+}
+
+async function requestJson<T extends LastFmErrorPayload>(
+  url: URL,
+  callerSignal?: AbortSignal,
+): Promise<T> {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
+    try {
+      return await fetchJson<T>(url, callerSignal);
+    } catch (error) {
+      lastError = error;
+      if (callerSignal?.aborted || !isRetryable(error) || attempt === MAX_ATTEMPTS) {
+        throw error;
+      }
+      await delay(250 * 2 ** (attempt - 1), callerSignal);
+    }
+  }
+
+  throw lastError;
+}
+
+async function fetchJson<T extends LastFmErrorPayload>(
+  url: URL,
+  callerSignal?: AbortSignal,
+): Promise<T> {
+  const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+  const signal = callerSignal ? AbortSignal.any([callerSignal, timeout]) : timeout;
+
+  const response = await fetch(url, {
+    headers: { "User-Agent": USER_AGENT },
+    signal,
+  });
+
+  if (!response.ok) {
+    throw new LastFmError(
+      response.status,
+      `Last.fm request failed with HTTP ${response.status}`,
+    );
+  }
+
+  const payload = (await response.json()) as T;
+
+  if (typeof payload.error === "number") {
+    throw new LastFmError(payload.error, payload.message ?? "Last.fm request failed");
+  }
+
+  return payload;
 }
 
 function requireUser(user: string): string {

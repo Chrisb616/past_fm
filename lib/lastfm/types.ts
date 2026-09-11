@@ -1,6 +1,7 @@
 export type UnixTimestamp = Date | number;
 
 export type GetRecentTracksParams = {
+  apiKey: string;
   user: string;
   from: UnixTimestamp;
   to: UnixTimestamp;
@@ -10,6 +11,7 @@ export type GetRecentTracksParams = {
 };
 
 export type GetRecentTracksInRangeParams = {
+  apiKey: string;
   user: string;
   from: UnixTimestamp;
   to: UnixTimestamp;
@@ -17,6 +19,7 @@ export type GetRecentTracksInRangeParams = {
 };
 
 export type GetUserInfoParams = {
+  apiKey: string;
   user: string;
   signal?: AbortSignal;
 };

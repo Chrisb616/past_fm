@@ -1,6 +1,11 @@
 import "server-only";
 
-export { LastFmClient, getLastFmClient } from "./client";
+export {
+  getLastFmApiKey,
+  getRecentTracks,
+  getRecentTracksInRange,
+  getUserInfo,
+} from "./client";
 export { LastFmError } from "./errors";
 export type {
   GetRecentTracksInRangeParams,
