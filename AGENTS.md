@@ -1,4 +1,12 @@
 
+# Past.fm
+
+This application is still in progress. The goal is to create a 
+
+- Last.fm: a website which tracks listening data for a user
+- scrobble: a single listen of a track
+
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know

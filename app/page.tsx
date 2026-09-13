@@ -22,7 +22,7 @@ import type { SelectChangeEvent } from "@mui/material/Select";
 import EditIcon from "@mui/icons-material/Edit";
 
 import { getRecentTracksAction, getUserInfoAction } from "@/lib/lastfm/actions";
-import type { TrackDto, UserInfoDto } from "@/lib/lastfm/actions";
+import type { ListeningCharts, UserInfoDto } from "@/lib/lastfm/actions";
 import {
   RANGE_TYPES,
   SEASON_LABELS,
@@ -60,7 +60,7 @@ type TracksLoad = {
   user: string;
   from: number;
   to: number;
-  tracks?: TrackDto[];
+  charts?: ListeningCharts;
   error?: string;
 };
 
@@ -89,7 +89,7 @@ function Home() {
     tracksLoad.user === query.user &&
     tracksLoad.from === query.from &&
     tracksLoad.to === query.to;
-  const tracks = tracksMatch ? tracksLoad.tracks : undefined;
+  const charts = tracksMatch ? tracksLoad.charts : undefined;
   const tracksError = tracksMatch ? tracksLoad.error : undefined;
   const tracksLoading = showTracks && !tracksMatch;
 
@@ -143,7 +143,7 @@ function Home() {
     getRecentTracksAction({ user, from, to })
       .then((result) => {
         if (cancelled) return;
-        setTracksLoad({ user, from, to, tracks: result });
+        setTracksLoad({ user, from, to, charts: result });
       })
       .catch((error: unknown) => {
         if (cancelled) return;
@@ -440,9 +440,11 @@ function Home() {
           </Typography>
           {tracksLoading ? <Typography>Loading tracks…</Typography> : null}
           {tracksError ? <Typography color="error">{tracksError}</Typography> : null}
-          {tracks && tracks.length === 0 ? <Typography>No tracks in this range.</Typography> : null}
-          {tracks?.map((track, index) => (
-            <Typography key={trackKey(track, index)} component="p">
+          {charts && charts.tracks.length === 0 ? (
+            <Typography>No tracks in this range.</Typography>
+          ) : null}
+          {charts?.tracks.map((track) => (
+            <Typography key={track.id} component="p">
               {track.artistName} — {track.name}
             </Typography>
           ))}
@@ -452,7 +454,3 @@ function Home() {
   );
 }
 
-function trackKey(track: TrackDto, index: number): string {
-  const playedAt = track.playedAtIso ?? "unknown";
-  return `${index}-${track.url}-${playedAt}`;
-}

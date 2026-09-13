@@ -1,8 +1,14 @@
 "use server";
 
+import {
+  aggregateScrobbles,
+  type ListeningCharts,
+} from "@/lib/scrobbles/aggregate";
 import { getLastFmApiKey, getRecentTracksInRange, getUserInfo } from "./client";
 import { LastFmError, isUserNotFoundError } from "./errors";
 import type { UserImage } from "./types";
+
+export type { ListeningCharts };
 
 export type UserInfoDto = {
   name: string;
@@ -11,13 +17,6 @@ export type UserInfoDto = {
   playcount: number;
   registered: number;
   imageUrl?: string;
-};
-
-export type TrackDto = {
-  artistName: string;
-  name: string;
-  url: string;
-  playedAtIso: string | null;
 };
 
 export type GetUserInfoActionResult =
@@ -53,16 +52,11 @@ export async function getRecentTracksAction(params: {
   user: string;
   from: number;
   to: number;
-}): Promise<TrackDto[]> {
+}): Promise<ListeningCharts> {
   try {
     const apiKey = await getLastFmApiKey();
     const tracks = await getRecentTracksInRange({ apiKey, ...params });
-    return tracks.map((track) => ({
-      artistName: track.artist.name,
-      name: track.name,
-      url: track.url,
-      playedAtIso: track.playedAt?.toISOString() ?? null,
-    }));
+    return aggregateScrobbles(tracks);
   } catch (error) {
     throw new Error(errorMessage(error, "Failed to load tracks."));
   }
